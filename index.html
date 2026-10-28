@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebLive - Publish Website</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#f1f5f9;color:#172033}
+header{background:#155eef;color:white;padding:24px 18px;border-radius:0 0 22px 22px}
+header h1{font-size:28px}
+header p{margin-top:8px}
+main{max-width:600px;margin:auto;padding:18px}
+.card{background:white;border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 4px 15px #00000008}
+h2{font-size:20px;margin-bottom:12px}
+p{line-height:1.5;color:#64748b;margin-bottom:12px}
+label{display:block;font-weight:bold;margin:12px 0 6px}
+input,textarea{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px}
+textarea{min-height:85px;resize:vertical}
+button{width:100%;padding:14px;border:0;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;margin-top:12px}
+.primary{background:#155eef;color:white}
+.secondary{background:#eaf0ff;color:#155eef}
+.notice{background:#fff7db;color:#795800;padding:12px;border-radius:10px;font-size:13px;margin-top:12px;overflow-wrap:anywhere}
+.hidden{display:none}
+.item{border:1px solid #e2e8f0;border-radius:10px;padding:13px;margin-top:10px;overflow-wrap:anywhere}
+.status{font-size:13px;margin-top:10px}
+footer{text-align:center;color:#64748b;padding:20px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<h1>🌐 WebLive</h1>
+<p>Apni website ko aasani se publish karo.</p>
+</header>
+
+<main>
+<section id="home">
+<div class="card">
+<h2>Welcome to WebLive</h2>
+<p>Apna project banao, files upload karo aur use online publish karo.</p>
+<button class="primary" onclick="show('create')">＋ Create Website</button>
+</div>
+<div class="card">
+<h2>🌍 My Websites</h2>
+<div id="list">Abhi koi website nahi hai.</div>
+<button class="secondary" onclick="loadSites()">Refresh</button>
+</div>
+</section>
+
+<section id="create" class="hidden">
+<div class="card">
+<h2>1. Project ki jankari</h2>
+<label for="project">Project ka naam</label>
+<input id="project" maxlength="60" placeholder="Brain Puzzle Game">
+
+<label for="description">Website ki jankari</label>
+<textarea id="description" maxlength="500" placeholder="Website kis baare mein hai?"></textarea>
+
+<h2 style="margin-top:22px">2. Website ka naam</h2>
+<label for="slug">Website address ka naam</label>
+<input id="slug" maxlength="40" placeholder="brain-puzzle"
+oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'')">
+
+<h2 style="margin-top:22px">3. Files upload karo</h2>
+<p>Apne project ki files ek ZIP mein rakho. ZIP ke andar index.html seedhe root folder mein honi chahiye.</p>
+<label for="zip">Website project ZIP</label>
+<input id="zip" type="file" accept=".zip">
+
+<button class="primary" onclick="publish()">🚀 Publish Website</button>
+<button class="secondary" onclick="show('home')">Cancel</button>
+<div id="message" class="status"></div>
+<div class="notice">Asli publishing ke liye server aur hosting provider configure hona zaroori hai.</div>
+</div>
+</section>
+</main>
+
+<footer>WebLive · Website Publishing Tool</footer>
+
+<script>
+const API = "/api";
+
+function show(id){
+  document.querySelectorAll("main section").forEach(s=>s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+  window.scrollTo(0,0);
+}
+
+async function publish(){
+  const project = document.getElementById("project").value.trim();
+  const description = document.getElementById("description").value.trim();
+  const slug = document.getElementById("slug").value.trim();
+  const zip = document.getElementById("zip").files[0];
+  const message = document.getElementById("message");
+
+  if(!project || !description || !slug || !zip){
+    alert("Saari jankari bharo aur ZIP file select karo.");
+    return;
+  }
+
+  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)){
+    alert("Website naam mein English letters, numbers aur hyphen use karo.");
+    return;
+  }
+
+  if(!zip.name.toLowerCase().endsWith(".zip")){
+    alert("ZIP file select karo.");
+    return;
+  }
+
+  if(zip.size > 25 * 1024 * 1024){
+    alert("ZIP file 25 MB se chhoti honi chahiye.");
+    return;
+  }
+
+  const form = new FormData();
+  form.append("project", project);
+  form.append("description", description);
+  form.append("slug", slug);
+  form.append("website", zip);
+
+  message.textContent = "Publishing request bheji ja rahi hai...";
+  message.style.color = "#155eef";
+
+  try{
+    const response = await fetch(API + "/publish", {
+      method:"POST",
+      body:form
+    });
+
+    const result = await response.json();
+
+    if(!response.ok) throw new Error(result.error || "Publishing fail hui.");
+
+    message.textContent = "Website LIVE: " + result.url;
+    message.style.color = "green";
+    loadSites();
+  }catch(error){
+    message.textContent = "Error: " + error.message;
+    message.style.color = "#b42318";
+  }
+}
+
+async function loadSites(){
+  const list = document.getElementById("list");
+
+  try{
+    const response = await fetch(API + "/sites");
+    if(!response.ok) throw new Error("Server unavailable");
+
+    const result = await response.json();
+    list.replaceChildren();
+
+    if(!result.sites || !result.sites.length){
+      list.textContent = "Abhi koi published website nahi hai.";
+      return;
+    }
+
+    result.sites.forEach(site=>{
+      const box = document.createElement("div");
+      box.className = "item";
+
+      const title = document.createElement("strong");
+      title.textContent = site.project;
+
+      const link = document.createElement("p");
+      link.textContent = site.url;
+
+      const open = document.createElement("button");
+      open.className = "secondary";
+      open.textContent = "Open Website";
+      open.onclick = ()=>window.open(site.url, "_blank", "noopener");
+
+      box.append(title, link, open);
+      list.appendChild(box);
+    });
+  }catch(error){
+    list.textContent = "Backend abhi connect nahi hai. Server deploy karne ke baad websites yahan dikhenge.";
+  }
+}
+
+loadSites();
+</script>
+</body>
+</html>
